@@ -10,8 +10,9 @@
  *   	- 子项二
  *
  * 标记写成什么样可以在设置里改：默认是 Logseq 原样的 collapsed:: true（和 Logseq 互通），
- * 也可以写成 Obsidian 注释 %% collapsed:: true %%，或者任意一行自定义文本。
- * 带不带 %% 都认，collapsed:: false 当作展开 —— 换了写法，旧笔记里的标记照样有效。
+ * 也可以写成 Obsidian 注释 %% collapsed:: true %%、HTML 注释 <!-- collapsed:: true -->（任何渲染器都不显示），
+ * 或者任意一行自定义文本。
+ * 裸写、%%、<!-- --> 三种都认，collapsed:: false 当作展开 —— 换了写法，旧笔记里的标记照样有效。
  *
  * 不管写成哪种，这行东西平时一个字都看不见：
  *   · 阅读视图：%% 注释 Obsidian 本来就不渲染；不带 %% 的那行插件从渲染结果里删掉（Dataview 渲染成的内联字段也藏）
@@ -44,7 +45,7 @@ const HAS_FOLD = !!(lang && lang.foldEffect && lang.unfoldEffect && lang.foldedR
 const OURS = Annotation.define();   // 插件自己发的折叠 / 改标记：不当成你的操作再记一遍
 
 const LIST_RE = /^([ \t]*)([-*+]|\d+[.)])([ \t]+|$)(.*)$/;          // 列表项：无序（- * +）和有序（1. 1)）一样看待
-const COLLAPSED_RE = /^[ \t]*(?:%%[ \t]*)?collapsed::[ \t]*(true|false)[ \t]*(?:%%)?[ \t]*$/i;   // collapsed:: 那一行，带不带 %% 都认
+const COLLAPSED_RE = /^[ \t]*(?:%%[ \t]*|<!--[ \t]*)?collapsed::[ \t]*(true|false)[ \t]*(?:%%|-->)?[ \t]*$/i;   // collapsed:: 那一行，裸写、%% 注释、HTML 注释都认
 const FENCE_RE = /^[ \t]*(`{3,}|~{3,})/;                            // 代码块围栏：里面的「列表」不算
 const CALLOUT_RE = /^((?:>[ \t]?)+)/;                               // callout：> - a 里的列表照样认。只认行首的 >，且每个 > 后面最多吃一个空白，不能把列表自己的缩进吃掉
 const BLOCK_ID_RE = /^[ \t]*\^[A-Za-z0-9-]+[ \t]*$/;                 // 单独一行的块 ID（^q-gufz，制卡插件常这么写，多半顶格）：算上一项的
@@ -53,9 +54,11 @@ const MARKDOWN_RE = /(\*\*|__|[*_`~]{1,2}|!?\[\[|\]\]|!?\[|\]\([^)]*\)|\(\))/g;
 
 const TAB_SIZE = 4;
 const ANCHOR_LEN = 16;      // 指纹取标题头几个字
-// 写进文件的标记：两种预设，或者用户自己填的一行字
+// 写进文件的标记：三种预设，或者用户自己填的一行字
 const MARKER_LOGSEQ = "collapsed:: true";
 const MARKER_COMMENT = "%% collapsed:: true %%";
+const MARKER_HTML = "<!-- collapsed:: true -->";   // 任何 Markdown 渲染器都不显示，事后也好用一条正则全删
+const PRESETS = { logseq: MARKER_LOGSEQ, comment: MARKER_COMMENT, html: MARKER_HTML };
 let ATTR_TEXT = MARKER_LOGSEQ;
 let CUSTOM_RE = null;       // 自定义标记（不是 collapsed:: 那种）按整行原样认，空白随意
 
@@ -99,9 +102,10 @@ const STRINGS = {
 		cleared: (n) => `Removed ${n} fold ${n === 1 ? "marker" : "markers"}`,
 		hMarker: "Fold marker",
 		markerName: "Marker style",
-		markerDesc: "The line written under a folded item. Every style is hidden from view; collapsed:: lines are recognised with or without %%, so switching styles keeps existing folds.",
+		markerDesc: "The line written under a folded item. Every style is hidden from view; collapsed:: lines are recognised bare, inside %% or inside <!-- -->, so switching styles keeps existing folds. The HTML comment stays invisible in any Markdown renderer.",
 		markerLogseq: "Logseq: collapsed:: true",
 		markerComment: "Obsidian comment: %% collapsed:: true %%",
+		markerHtml: "HTML comment: <!-- collapsed:: true -->",
 		markerCustom: "Custom",
 		customName: "Custom marker",
 		customDesc: "Any single line of text, written as-is under each folded item.",
@@ -135,9 +139,10 @@ const STRINGS = {
 		cleared: (n) => `清掉 ${n} 行折叠标记，原文还原了`,
 		hMarker: "折叠标记",
 		markerName: "标记写法",
-		markerDesc: "折叠时写在那一项下面的一行。哪种写法都看不见；collapsed:: 带不带 %% 都认，换写法不会丢掉已有的折叠。",
+		markerDesc: "折叠时写在那一项下面的一行。哪种写法都看不见；collapsed:: 裸写、包在 %% 里、包在 <!-- --> 里都认，换写法不会丢掉已有的折叠。HTML 注释在任何 Markdown 渲染器里都不显示。",
 		markerLogseq: "Logseq：collapsed:: true",
 		markerComment: "Obsidian 注释：%% collapsed:: true %%",
+		markerHtml: "HTML 注释：<!-- collapsed:: true -->",
 		markerCustom: "自定义",
 		customName: "自定义标记",
 		customDesc: "任意一行文字，原样写在每个折叠项下面。",
@@ -967,7 +972,7 @@ function setAttrLine(text, line, fold, pad) {
 // 阅读视图：不带 %% 的标记会被渲染成文字，从渲染结果里删掉，连它前面那个换行（<br>）一起。
 // Dataview 会把 collapsed:: true 渲染成内联字段，那个由 styles.css 藏
 function markerTextRe() {
-	const parts = ["(?:%%[ \\t]*)?collapsed::[ \\t]*(?:true|false)(?:[ \\t]*%%)?"];
+	const parts = ["(?:%%[ \\t]*|<!--[ \\t]*)?collapsed::[ \\t]*(?:true|false)(?:[ \\t]*(?:%%|-->))?"];
 	if (CUSTOM_RE) parts.push(ATTR_TEXT.split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[ \\t]+"));
 	return new RegExp("[ \\t]*\\n?[ \\t]*(?:" + parts.join("|") + ")[ \\t]*", "gi");
 }
@@ -1056,23 +1061,23 @@ class FoldSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl).setName(T.hMarker).setHeading();
-		const preset = s.marker === MARKER_LOGSEQ ? "logseq" : s.marker === MARKER_COMMENT ? "comment" : "custom";
+		const preset = Object.keys(PRESETS).find((k) => PRESETS[k] === s.marker) || "custom";
 		new Setting(containerEl)
 			.setName(T.markerName)
 			.setDesc(T.markerDesc)
 			.addDropdown((d) => d
 				.addOption("logseq", T.markerLogseq)
 				.addOption("comment", T.markerComment)
+				.addOption("html", T.markerHtml)
 				.addOption("custom", T.markerCustom)
 				.setValue(preset)
 				.onChange(async (v) => {
-					if (v === "logseq") s.marker = MARKER_LOGSEQ;
-					else if (v === "comment") s.marker = MARKER_COMMENT;
-					else if (s.marker === MARKER_LOGSEQ || s.marker === MARKER_COMMENT) s.marker = "";
+					if (PRESETS[v]) s.marker = PRESETS[v];
+					else if (Object.values(PRESETS).includes(s.marker)) s.marker = "";
 					await this.plugin.saveSettings();
 					this.display();
 				}));
-		if (preset === "custom" || (s.marker !== MARKER_LOGSEQ && s.marker !== MARKER_COMMENT)) {
+		if (preset === "custom") {
 			new Setting(containerEl)
 				.setName(T.customName)
 				.setDesc(T.customDesc)

@@ -10,7 +10,7 @@ An Obsidian plugin that remembers how each list item was collapsed, by writing a
 
 Logseq stores a folded block as a `collapsed:: true` property right under it. Obsidian does not understand that line: a vault that came from Logseq shows it as plain text, and Obsidian's own folds are forgotten as soon as the note is closed.
 
-This plugin reads and writes that marker. **The Logseq style is the default**, so notes stay compatible with Logseq. If you prefer something else, set your own marker — for example an Obsidian comment `%% collapsed:: true %%`, or any line of text you like.
+This plugin reads and writes that marker. **The Logseq style is the default**, so notes stay compatible with Logseq. If you prefer something else, set your own marker — an HTML comment `<!-- collapsed:: true -->`, an Obsidian comment `%% collapsed:: true %%`, or any line of text you like.
 
 ## What it does
 
@@ -37,10 +37,24 @@ Nothing else about your note changes.
 | Style | Written as | Notes |
 |---|---|---|
 | Logseq (default) | `collapsed:: true` | Same as Logseq; notes round-trip between the two apps |
-| Obsidian comment | `%% collapsed:: true %%` | Invisible even without the plugin, in any Obsidian install |
+| HTML comment | `<!-- collapsed:: true -->` | Invisible in **any** Markdown renderer — GitHub, static-site generators, other editors |
+| Obsidian comment | `%% collapsed:: true %%` | Invisible in Obsidian even without the plugin, but other renderers show it as text |
 | Custom | any single line, e.g. `[folded]` | Written as-is under each folded item |
 
-`collapsed::` lines are always recognised, with or without `%%`, whichever style you write — so switching styles never loses existing folds. `collapsed:: false` (which Logseq can leave behind) is treated as unfolded and is reused when you fold that item again.
+`collapsed::` lines are always recognised — bare, inside `%% … %%` or inside `<!-- … -->` — whichever style you write, so switching styles never loses existing folds. `collapsed:: false` (which Logseq can leave behind) is treated as unfolded and is reused when you fold that item again.
+
+### Recommended if your notes go elsewhere: the HTML comment
+
+If your notes are also published or read outside Obsidian — a blog, a GitHub repo, a static site, another editor — pick the **HTML comment** style:
+
+- **Clean everywhere.** Every Markdown renderer drops HTML comments, so the published page shows no trace of your folds. A bare `collapsed:: true` or an Obsidian `%% … %%` comment would show up there as text.
+- **Easy to remove for good.** The markers are a fixed, unambiguous pattern, so one regex search-and-replace across the vault (with multiline mode on) deletes them all and leaves everything else untouched:
+
+  ```regex
+  ^[ \t]*<!--[ \t]*collapsed::[ \t]*(?:true|false)[ \t]*-->[ \t]*\r?\n
+  ```
+
+  Replace with nothing. Only whole marker lines match; the same text inside a sentence is left alone. For a single note, the **Remove all fold markers from this note** command does the same.
 
 ## How it folds
 
@@ -73,7 +87,7 @@ Bind any of them to a hotkey in **Settings → Hotkeys**.
 
 | Setting | Default | What it does |
 |---|---|---|
-| Marker style | Logseq | Logseq `collapsed:: true`, Obsidian comment `%% collapsed:: true %%`, or a custom line |
+| Marker style | Logseq | Logseq `collapsed:: true`, HTML comment `<!-- collapsed:: true -->`, Obsidian comment `%% collapsed:: true %%`, or a custom line |
 | Show a fold button on hover | On | An unfolded item shows a small collapse button at the end of its line while hovered |
 | Show descendant count on the fold button | On | `⌄ 3` instead of `⌄` |
 | Fold in Reading view | On | Honour the markers in Reading view, with a clickable badge to unfold |
@@ -86,7 +100,7 @@ Copy `main.js`, `manifest.json` and `styles.css` into `<vault>/.obsidian/plugins
 
 ## Notes and limits
 
-- Outside Obsidian, `collapsed:: true` shows up as text — which is exactly what Logseq expects. Pick the comment style if you want it invisible in other Obsidian installs without the plugin too.
+- Outside Obsidian, `collapsed:: true` shows up as text — which is exactly what Logseq expects. Pick the HTML comment style if you want it invisible everywhere else.
 - Markers survive any tool that keeps the block they belong to. A rewrite that deletes or re-words the block itself loses its fold state.
 - Code blocks, callouts, ordered lists and checklists are handled. Lists inside tables are not folded.
 - Markers are matched by the item's own text fingerprint within its nesting level, so two identical items at the same depth in one note share a fold state.

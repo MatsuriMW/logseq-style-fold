@@ -10,7 +10,7 @@
 
 Logseq 把折叠记成块下面的一行 `collapsed:: true`。Obsidian 不认这一行：从 Logseq 搬过来的库里它就是一行字；Obsidian 自己的折叠，笔记一关就忘。
 
-这个插件负责读写这行标记。**默认就是 Logseq 写法**，笔记和 Logseq 互通。想用别的也行，自己配一个标记：比如 Obsidian 注释 `%% collapsed:: true %%`，或者任意一行你喜欢的文字。
+这个插件负责读写这行标记。**默认就是 Logseq 写法**，笔记和 Logseq 互通。想用别的也行，自己配一个标记：HTML 注释 `<!-- collapsed:: true -->`、Obsidian 注释 `%% collapsed:: true %%`，或者任意一行你喜欢的文字。
 
 ## 它做什么
 
@@ -37,10 +37,24 @@ Logseq 把折叠记成块下面的一行 `collapsed:: true`。Obsidian 不认这
 | 写法 | 写进文件的样子 | 说明 |
 |---|---|---|
 | Logseq（默认） | `collapsed:: true` | 和 Logseq 一样，两边来回用都认 |
-| Obsidian 注释 | `%% collapsed:: true %%` | 没装插件的 Obsidian 里也看不见 |
+| HTML 注释 | `<!-- collapsed:: true -->` | **任何** Markdown 渲染器里都看不见：GitHub、静态博客、别的编辑器 |
+| Obsidian 注释 | `%% collapsed:: true %%` | 没装插件的 Obsidian 里也看不见，但别的渲染器会把它当文字显示 |
 | 自定义 | 任意一行字，比如 `[folded]` | 原样写在每个折叠项下面 |
 
-不管你选哪种写法，`collapsed::` 这种行带不带 `%%` 都认，所以换写法不会丢掉已有的折叠。`collapsed:: false`（Logseq 有时会留下）当作展开；下次折叠这一项时直接改成 true，不另插一行。
+不管你选哪种写法，`collapsed::` 这种行裸写、包在 `%% … %%` 里、包在 `<!-- … -->` 里都认，所以换写法不会丢掉已有的折叠。`collapsed:: false`（Logseq 有时会留下）当作展开；下次折叠这一项时直接改成 true，不另插一行。
+
+### 笔记还要发到别处的话，推荐 HTML 注释
+
+如果你的笔记还会在 Obsidian 以外被看到 —— 博客、GitHub 仓库、静态网站、别的编辑器 —— 选 **HTML 注释**写法：
+
+- **到哪儿都干净**：所有 Markdown 渲染器都会丢掉 HTML 注释，发出去的页面上看不到任何折叠痕迹。裸写的 `collapsed:: true` 和 Obsidian 的 `%% … %%` 在那些地方都会显示成文字。
+- **事后一键删干净**：标记是固定、不会和正文混淆的格式，全库用一条正则查找替换（打开多行模式）就能全部删掉，别的内容一概不碰：
+
+  ```regex
+  ^[ \t]*<!--[ \t]*collapsed::[ \t]*(?:true|false)[ \t]*-->[ \t]*\r?\n
+  ```
+
+  替换成空。只匹配整行的标记，句子里出现的同样文字不会被删。只清一篇的话，用命令「清除本文所有折叠标记」也一样。
 
 ## 怎么折叠的
 
@@ -73,7 +87,7 @@ Logseq 把折叠记成块下面的一行 `collapsed:: true`。Obsidian 不认这
 
 | 设置 | 默认 | 作用 |
 |---|---|---|
-| 标记写法 | Logseq | Logseq `collapsed:: true`、Obsidian 注释 `%% collapsed:: true %%`，或自定义一行 |
+| 标记写法 | Logseq | Logseq `collapsed:: true`、HTML 注释 `<!-- collapsed:: true -->`、Obsidian 注释 `%% collapsed:: true %%`，或自定义一行 |
 | 鼠标划过时显示折叠按钮 | 开 | 展开着的项，鼠标划过时行尾冒出折叠按钮 |
 | 折叠按钮上显示后代条数 | 开 | 显示 `⌄ 3` 而不是 `⌄` |
 | 阅读视图也折叠 | 开 | 阅读视图里照标记收起列表，点小标记展开 |
@@ -86,7 +100,7 @@ Logseq 把折叠记成块下面的一行 `collapsed:: true`。Obsidian 不认这
 
 ## 说明和限制
 
-- 在 Obsidian 以外，`collapsed:: true` 会显示成文字 —— 这正是 Logseq 要的。想让没装插件的 Obsidian 里也看不见，就选注释写法。
+- 在 Obsidian 以外，`collapsed:: true` 会显示成文字 —— 这正是 Logseq 要的。想在别的地方也看不见，就选 HTML 注释写法。
 - 标记跟着它所属的那一块走。改写把那一块删了或改了措辞，折叠状态就没了，这没办法。
 - 代码块、callout、有序列表、任务列表都支持。表格里的列表不折叠。
 - 标记按这一项自己文字的指纹、在同一层级里对应，所以同一篇里同一层两项文字一模一样的话，会共用折叠状态。
