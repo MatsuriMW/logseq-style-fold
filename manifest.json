@@ -1,7 +1,7 @@
 {
   "id": "logseq-style-fold",
   "name": "Logseq Style Fold",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "minAppVersion": "1.4.0",
   "description": "Remember how list items are folded by writing a Logseq-style collapsed:: true line into the note, hidden from view. The marker text is configurable.",
   "author": "马自立",

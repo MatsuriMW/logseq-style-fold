@@ -58,12 +58,13 @@ If your notes are also published or read outside Obsidian — a blog, a GitHub r
 
 ## How it folds
 
-The folding itself is not drawn by this plugin — it calls the same CodeMirror fold that ⌥S uses. You get Obsidian's own arrow, the `…` at the end of the line, the same click to unfold.
+The folding itself is not drawn by this plugin — it calls the same CodeMirror fold that ⌥S uses. You get Obsidian's own arrow, the `…` at the end of the line, the same click to unfold. A folded numbered item shows its number darker and bold, instead of in the accent color Obsidian uses by default.
 
 Marker and fold are kept in sync in both directions:
 
 - A marker in the file folds that item when the note opens, and again whenever another plugin or a sync rewrites the file and the fold gets lost. This direction only ever folds; it never unfolds something for you.
 - Fold something yourself — ⌥S, the arrow, whatever you already use — and the marker is written for you. Unfold it and the marker is removed. Typing and rewrites of the file don't count as folding.
+- Jump to a line inside a fold from elsewhere — a backlink, a search result, a block reference — and the folds around it open, their markers are removed, and the cursor lands on that line. Nothing outside the fold changes.
 - Another plugin that folds on its own can wrap that in `app.plugins.plugins["logseq-style-fold"].quietly(() => …)`, and those folds are not recorded as yours.
 
 ## Why the state lives in the file

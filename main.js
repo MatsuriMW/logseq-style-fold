@@ -27,6 +27,7 @@
  *   · 标记 → 折叠：打开笔记时、文件被别的插件 / 同步改写后折叠丢了时，有标记的项补折上。只补折，不替你展开
  *   · 折叠 → 标记：你手动折 / 展开之后（⌥S、点箭头、点 …），照编辑器里实际折没折，一次写好这几项的标记。
  *     打字、文件被改写这类改正文的变动不算；别的插件折叠时用 quietly() 包住，就不会被当成你的操作记下来
+ *   · 从别处跳进来（反链、搜索、块引用……）落在折叠里：展开目标所在的折叠块，标记一起清掉
  */
 
 "use strict";
@@ -245,6 +246,25 @@ module.exports = class LogseqStyleFold extends Plugin {
 			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 			if (view && view.editor && view.editor.cm) this.applyFolds(view.editor.cm);
 		}));
+
+		// 从外面定位到这篇里的某一处（反链、搜索结果、块引用、别的插件跳过来……）：
+		// Obsidian 都是带着 line / subpath / match 打开笔记，最后落到 setEphemeralState。
+		// 包一层：定位完把目标所在的折叠块（连同目标自己）展开，标记一起清掉，免得随后又按标记折回去
+		const plugin = this;
+		const proto = MarkdownView.prototype;
+		const own = Object.prototype.hasOwnProperty.call(proto, "setEphemeralState");
+		const orig = proto.setEphemeralState;
+		proto.setEphemeralState = function (st) {
+			const r = orig.apply(this, arguments);
+			if (st && (st.line != null || st.subpath || st.match)) {
+				const view = this;
+				const go = () => { try { plugin.revealCursor(view); } catch (e) { console.error("[logseq-style-fold] 跳转后展开失败", e); } };
+				go();
+				setTimeout(go, 0);   // 有的版本光标是稍后才落下的
+			}
+			return r;
+		};
+		this.register(() => { if (own) proto.setEphemeralState = orig; else delete proto.setEphemeralState; });
 	}
 
 	onunload() {
@@ -450,6 +470,35 @@ module.exports = class LogseqStyleFold extends Plugin {
 		}
 		this.refresh(ctx.file);
 		if (fold) new Notice(T.folded(targets.length));
+	}
+
+	// 光标所在那一行露出来：包着它的母项、它自己（带子项、折着的话）都展开，标记清掉，再把它滚到屏幕中间。
+	// 不在折叠里的什么都不动
+	revealCursor(mdView) {
+		const view = mdView && mdView.editor && mdView.editor.cm;
+		if (!HAS_FOLD || !view || !view.state || !(mdView.file instanceof TFile)) return;
+		const state = view.state;
+		const pos = state.selection.main.head;
+		const line = state.doc.lineAt(pos).number - 1;
+		const parsed = this.doc(mdView.file, state.doc.toString());
+		const hits = parsed.items.filter((it) => it.childCount && it.line <= line && line <= it.end);
+		const marked = hits.filter((it) => it.folded);
+		const effects = [];
+		const lineStart = state.doc.line(line + 1).from;
+		// 盖住目标的折叠（不管有没有标记：别的插件折的也算），和从目标这一行起头的折叠
+		lang.foldedRanges(state).between(0, state.doc.length, (f, t) => {
+			if ((f < lineStart && t >= lineStart) || hits.some((it) => it.line === line && this.foldsOf(state, it).some((r) => r.from === f))) {
+				effects.push(lang.unfoldEffect.of({ from: f, to: t }));
+			}
+		});
+		if (!effects.length && !marked.length) return;
+		if (effects.length) view.dispatch({ effects, annotations: OURS.of(true) });
+		const edits = this.attrEdits(view.state.doc, parsed, marked.slice().sort((a, b) => b.line - a.line), false);
+		if (edits.length) view.dispatch({ changes: edits, annotations: [OURS.of(true), Transaction.addToHistory.of(false)] });
+		this.forget(mdView.file);
+		this.refresh(mdView.file);
+		const at = view.state.selection.main.head;
+		view.dispatch({ effects: EditorView.scrollIntoView(at, { y: "center" }) });
 	}
 
 	// 写 / 删标记行。只动真有（或真没有）标记的那一行：下面那行不是标记就绝不删，已经有了就不重复插

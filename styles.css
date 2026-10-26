@@ -73,6 +73,14 @@
 	display: flex;
 }
 
+/* 折起来的有序列表项：数字变深、加粗（和折起来的圆点一样是变深），不用 Obsidian 默认的强调色 */
+.markdown-source-view.mod-cm6 .is-collapsed ~ .cm-formatting-list-ol,
+.markdown-rendered ol > li.is-collapsed::marker,
+.markdown-rendered ol > li.lf-li-collapsed::marker {
+	color: var(--text-muted);
+	font-weight: var(--bold-weight);
+}
+
 /* 阅读视图：Dataview 会把 collapsed:: true 渲染成内联字段，连同它前面的换行一起藏掉（不带 %% 的标记才会走到这里） */
 .markdown-rendered .dataview.inline-field:has(> .inline-field-key[data-dv-norm-key="collapsed"]),
 .markdown-rendered br:has(+ .dataview.inline-field > .inline-field-key[data-dv-norm-key="collapsed"]) {
