@@ -36,7 +36,7 @@ const {
 	Plugin, PluginSettingTab, Setting, Notice, MarkdownView, TFile,
 	editorInfoField, editorLivePreviewField,
 } = require("obsidian");
-const { StateField, StateEffect, EditorState, Annotation, Transaction } = require("@codemirror/state");
+const { StateField, StateEffect, EditorState, Annotation, Transaction, Prec } = require("@codemirror/state");
 const { EditorView, Decoration, WidgetType, ViewPlugin } = require("@codemirror/view");
 
 // Obsidian 的折叠就是 CodeMirror 的折叠状态：直接读写它，折出来跟 ⌥S 一模一样，也不用挪光标、不受屏幕范围限制
@@ -706,8 +706,70 @@ module.exports = class LogseqStyleFold extends Plugin {
 			return [tr, { selection: { anchor: pos }, sequential: true }];
 		});
 
+		// 折着的项在行尾按回车：这一项连同折起来的子块不动，在整块后面新起一个同级项（Logseq 就是这样）。
+		// 不接管的话，回车会落在藏起来的标记行前面：Obsidian 自己的回车、Bullet 都把标记和子块分给新起的那一项。
+		// 最高优先级的 keydown 排在所有 keymap（包括 Bullet 的回车）前面
+		const enter = Prec.highest(EditorView.domEventHandlers({
+			keydown: (e, view) => {
+				if (e.key !== "Enter" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return false;
+				if (e.isComposing || e.keyCode === 229 || view.composing) return false;
+				if (!plugin.enterAfterFold(view)) return false;
+				e.preventDefault();
+				return true;
+			},
+		}));
+
 		this.markField = field;   // 排错用：view.state.field(plugin.markField) 是当前藏起来的标记行
-		return [field, snap, this.foldSyncExtension()];
+		return [field, snap, enter, this.foldSyncExtension()];
+	}
+
+	// 光标在一个折着的列表项的行尾：在它整块（子块、标记行、块 ID）后面插一个同级空项，光标放过去，折叠不动。
+	// 有序列表接着编号，后面紧接着的同级项顺延；原项有复选框，新项也带一个空的。不是这种情况返回 false，回车照常
+	enterAfterFold(view) {
+		if (!HAS_FOLD) return false;
+		const state = view.state;
+		if (!state.field(editorLivePreviewField, false) && !this.settings.sourceFold) return false;   // 屏幕上没折着
+		const sel = state.selection;
+		if (sel.ranges.length !== 1 || !sel.main.empty) return false;
+		const doc = state.doc;
+		const line = doc.lineAt(sel.main.head);
+		if (sel.main.head !== line.to) return false;
+		let foldTo = -1;
+		lang.foldedRanges(state).between(line.to, line.to, (from, to) => { if (from === line.to) foldTo = to; });
+		if (foldTo < 0) return false;
+		const file = state.field(editorInfoField, false)?.file;
+		if (!file) return false;
+		const parsed = this.doc(file, doc.toString());
+		const it = parsed.items.find((i) => i.line === line.number - 1);
+		if (!it || !it.childCount) return false;
+		const m = line.text.replace(CALLOUT_RE, "").match(LIST_RE);
+		if (!m) return false;
+
+		const num = m[2].match(/^(\d+)([.)])$/);
+		const bullet = num ? `${Number(num[1]) + 1}${num[2]}` : m[2];
+		const box = CHECKBOX_RE.test(m[4]) ? "[ ] " : "";
+		const insert = "\n" + it.callout + it.rawIndent + bullet + (m[3] || " ") + box;
+		const at = doc.line(it.end + 1).to;
+		const changes = [{ from: at, insert }];
+		// 后面紧接着的同级有序项：编号还连着的，各加一
+		if (num) {
+			const sibs = it.parent ? it.parent.children : parsed.items.filter((i) => !i.parent);
+			let want = Number(num[1]) + 1;
+			for (const s of sibs.slice(sibs.indexOf(it) + 1)) {
+				const sl = doc.line(s.line + 1);
+				const sm = sl.text.replace(CALLOUT_RE, "").match(LIST_RE);
+				const sn = sm && sm[2].match(/^(\d+)[.)]$/);
+				if (!sn || Number(sn[1]) !== want) break;
+				const pos = sl.from + s.callout.length + sm[1].length;
+				changes.push({ from: pos, to: pos + sn[1].length, insert: String(want + 1) });
+				want++;
+			}
+		}
+		view.dispatch({ changes, selection: { anchor: at + insert.length }, userEvent: "input", scrollIntoView: true });
+		// 正好插在折叠范围末尾时，Obsidian 会把这一项展开（在同一个事务里追加展开，同一事务里再折上没用）：
+		// 插完按原来的范围再折上。位置都在插入点之前，不受这次改动影响；这一步不进撤销记录
+		view.dispatch({ effects: lang.foldEffect.of({ from: line.to, to: foldTo }), annotations: OURS.of(true) });
+		return true;
 	}
 
 	// ------------------------------------------------------------ 跟 Obsidian 自带折叠互相通气
