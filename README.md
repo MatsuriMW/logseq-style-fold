@@ -6,6 +6,19 @@ An Obsidian plugin that remembers how each list item was collapsed, by writing a
 
 **English** · [简体中文](./README.zh-CN.md)
 
+**Contents**
+
+- [Why](#why)
+- [What it does](#what-it-does)
+- [Markers](#markers)
+- [How it folds](#how-it-folds)
+- [Why the state lives in the file](#why-the-state-lives-in-the-file)
+- [Commands](#commands)
+- [Settings](#settings)
+- [Installing](#installing)
+- [Notes and limits](#notes-and-limits)
+- [Feedback and updates](#feedback-and-updates)
+
 ## Why
 
 Logseq stores a folded block as a `collapsed:: true` property right under it. Obsidian does not understand that line: a vault that came from Logseq shows it as plain text, and Obsidian's own folds are forgotten as soon as the note is closed.
