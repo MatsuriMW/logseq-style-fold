@@ -6,6 +6,8 @@
 
 [English](./README.md) · **简体中文**
 
+![两项下面写着 `collapsed:: true`：标记行看不到，折起来的项是带圈的圆点和省略号。](https://raw.githubusercontent.com/MatsuriMW/logseq-style-fold/main/docs/screenshot.png)
+
 **目录**
 
 - [为什么要它](#为什么要它)

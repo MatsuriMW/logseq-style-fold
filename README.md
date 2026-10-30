@@ -6,6 +6,8 @@ An Obsidian plugin that remembers how each list item was collapsed, by writing a
 
 **English** · [简体中文](./README.zh-CN.md)
 
+![Two items with `collapsed:: true` under them: the marker lines are hidden, and each folded item shows a ringed bullet and an ellipsis.](https://raw.githubusercontent.com/MatsuriMW/logseq-style-fold/main/docs/screenshot.png)
+
 **Contents**
 
 - [Why](#why)
