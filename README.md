@@ -107,3 +107,7 @@ Copy `main.js`, `manifest.json` and `styles.css` into `<vault>/.obsidian/plugins
 - Code blocks, callouts, ordered lists and checklists are handled. Lists inside tables are not folded.
 - Markers are matched by the item's own text fingerprint within its nesting level, so two identical items at the same depth in one note share a fold state.
 - The plugin only ever writes its own marker lines; nothing else in a note is modified.
+
+## Feedback and updates
+
+To follow new features, send feedback or keep up with progress, follow me on Twitter: [@Matsurimywaifu](https://x.com/Matsurimywaifu).
