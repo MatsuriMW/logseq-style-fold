@@ -876,14 +876,15 @@ module.exports = class LogseqStyleFold extends Plugin {
 			const key = depthOfLi(li) + "|" + fingerprintOf(liText(li));
 			const item = parsed.items.find((it) => it.depth + "|" + it.fingerprint === key);
 			const folded = !!(item && item.folded);
-			const badge = createSpan({ cls: "lf-collapse-marker lf-reading" + (folded ? "" : " lf-idle") });
-			badge.createSpan({ cls: "lf-dots", text: folded ? "⋯" : "⌄" });
-			if (folded && this.settings.showCount) {
+			if (!folded) continue;
+			const badge = createSpan({ cls: "lf-collapse-marker lf-reading" });
+			badge.createSpan({ cls: "lf-dots", text: "⋯" });
+			if (this.settings.showCount) {
 				const n = countDomItems(sub);
 				if (n) badge.createSpan({ cls: "lf-count", text: String(n) });
 			}
 			li.insertBefore(badge, sub);
-			if (folded) li.classList.add("lf-li-collapsed");
+			li.classList.add("lf-li-collapsed");
 			if (!item) continue;
 			badge.addEventListener("click", (e) => {
 				e.preventDefault();

@@ -62,17 +62,6 @@
 	display: none;
 }
 
-/* 阅读视图：展开着的项，那个折叠按钮平时藏起来，鼠标划到这一项才出来 */
-.markdown-preview-view .lf-collapse-marker.lf-idle,
-.markdown-rendered .lf-collapse-marker.lf-idle {
-	display: none;
-}
-
-.markdown-preview-view li:hover > .lf-collapse-marker.lf-idle,
-.markdown-rendered li:hover > .lf-collapse-marker.lf-idle {
-	display: flex;
-}
-
 /* 折起来的有序列表项：数字变深、加粗（和折起来的圆点一样是变深），不用 Obsidian 默认的强调色 */
 .markdown-source-view.mod-cm6 .is-collapsed ~ .cm-formatting-list-ol,
 .markdown-rendered ol > li.is-collapsed::marker,
